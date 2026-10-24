@@ -26,7 +26,8 @@ import {
 import { Decoration, type DecorationSet, EditorView, WidgetType } from "@codemirror/view";
 import { blockRevealed, concealments, type Conceal, type DocSlice, type Span } from "./livePreview";
 import { frontmatterRange } from "./frontmatter";
-import { openExternal } from "./bridge";
+import { followLink } from "./bridge";
+import { sessionIdFacet } from "./session";
 
 export type Align = "left" | "center" | "right" | null;
 export type SegStyle = "em" | "strong" | "strike" | "code";
@@ -220,7 +221,7 @@ class TableWidget extends WidgetType {
       const target = event.target instanceof HTMLElement ? event.target : null;
       const url = target?.closest<HTMLElement>("[data-url]")?.dataset.url;
       if (url) {
-        openExternal(url);
+        followLink(view.state.facet(sessionIdFacet), url);
         return;
       }
       const posText = target?.closest<HTMLElement>("[data-pos]")?.dataset.pos;

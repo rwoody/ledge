@@ -4,6 +4,7 @@
 // needed no editor changes. bootView wires the two ends to the Electroview RPC
 // main.tsx hands it (mainview/boot.tsx `configureBridge`).
 import type { NoteMeta, RunEvent } from "../../shared/rpc-schema";
+import { isNoteLink } from "../../shared/noteLinks";
 import type { TagInfo } from "../../shared/tags";
 import type { ConfirmSpec } from "../../shared/fenceInfo";
 
@@ -147,6 +148,11 @@ interface BridgeHandlers {
   // it. App wires it, since the store owns the lists. The snapshot is
   // synchronous because decoration passes cannot await.
   wikiNotes: (docId: string) => NoteMeta[];
+  // Follow a relative Markdown link (`[x](../a.md#H)`): resolve it against the
+  // doc's own folder in its workspace and open the note. App wires it, since
+  // dispatching openNote needs the store. A link that resolves to no note
+  // answers with a notice and opens nothing.
+  openNoteLink: (docId: string, href: string) => void;
   // Follow a wikilink: resolve `target` in the doc's own workspace and open
   // the note it names. App wires it, since dispatching openNote needs the
   // store. A dangling target is a no-op, never an error.
@@ -209,6 +215,15 @@ export function editProfile(name: string): void {
 // Link" command).
 export function openExternal(url: string): void {
   handlers.openLink?.(url);
+}
+
+// Follow a note link's URL from `docId`'s note. A relative `.md` link opens
+// that note in the app; every other URL leaves it (editor/livePreview.ts's
+// click, hotspot and "Open Link", and tables.ts). A note link never falls
+// through to openExternal: Bun would refuse it, and a refusal is silent.
+export function followLink(docId: string, url: string): void {
+  if (isNoteLink(url)) handlers.openNoteLink?.(docId, url);
+  else openExternal(url);
 }
 
 // The wikilink resolution set for a doc's workspace (editor/wikilinks.ts).

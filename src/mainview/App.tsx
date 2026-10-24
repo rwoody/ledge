@@ -28,7 +28,8 @@ import { TagsPanel } from "@/workspace/TagsPanel";
 import { WorkspaceView } from "@/workspace/WorkspaceView";
 import { HostPicker } from "@/components/HostPicker";
 import { LOCAL_HOST } from "../shared/frontmatter";
-import { configureStoreUi, flushAll, folderOf, onNoteEdited, paramsOf } from "@/notes/store";
+import { configureStoreUi, flushAll, folderOf, onNoteEdited, paramsOf, pathOf } from "@/notes/store";
+import { noteKey, noteRelPath, resolveNoteLink } from "../shared/noteLinks";
 import { parseWikiTarget, resolveWikiTitle } from "@/editor/wikilinks";
 import { refreshWikilinks } from "@/editor/livePreview";
 import { refreshFolder, syncWorkspaces } from "@/workspace/actions";
@@ -529,6 +530,26 @@ function Shell() {
       wikiNotes: (docId) => {
         const folder = folderOf(docId);
         return folder ? notesOf(stateRef.current, folder) : [];
+      },
+      // A relative `.md` link resolves against the linking note's own folder,
+      // then matches a note of the same workspace by its root-relative path.
+      // Nothing resolvable opens nothing and says so.
+      openNoteLink: (docId, href) => {
+        const folder = folderOf(docId);
+        if (!folder) return;
+        const notes = notesOf(stateRef.current, folder);
+        const from = notes.find((n) => n.path === pathOf(docId));
+        const link = resolveNoteLink(href, from?.folder ?? "");
+        const want = link && noteKey(link.path);
+        const note = want ? notes.find((n) => noteKey(noteRelPath(n)) === want) : undefined;
+        if (!link || !note) {
+          notify(
+            link ? `No note at ${link.path}` : "That link points outside the workspace or cannot be read",
+          );
+          return;
+        }
+        if (link.heading) requestHeadingReveal(note.path, link.heading);
+        dispatch({ type: "openNote", note, preview: true });
       },
       openWikiNote: (docId, target) => {
         const folder = folderOf(docId);

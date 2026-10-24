@@ -115,8 +115,12 @@ describe("concealments", () => {
   });
 
   test("an unopenable target still conceals but promises no click", () => {
-    expect(visible("x\n\n[notes](./other.md)")).toBe("x\n\nnotes");
-    expect(links("x\n\n[notes](./other.md)")).toEqual([{ text: "notes", url: null }]);
+    expect(visible("x\n\n[notes](./other.txt)")).toBe("x\n\nnotes");
+    expect(links("x\n\n[notes](./other.txt)")).toEqual([{ text: "notes", url: null }]);
+  });
+
+  test("a relative .md link is clickable: it names a note, not a URL", () => {
+    expect(links("x\n\n[notes](./other.md#H)")).toEqual([{ text: "notes", url: "./other.md#H" }]);
   });
 
   test("an image conceals to its alt text", () => {

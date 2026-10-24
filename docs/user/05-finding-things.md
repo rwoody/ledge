@@ -40,6 +40,8 @@ Links address the title, never the filename. A retitle renames the file without 
 
 Click a rendered link to follow it. When the caret is inside a link and the raw text shows, ⌘-click instead.
 
+Ordinary Markdown links to other notes work too. `[recovery map](reports/map.md)` opens that note, and `[focus](../daily/2026-10-22.md#Focus)` opens it at a heading. The path is relative to the note you are in, and a leading `/` starts from the workspace's top folder. A link that finds no note, or climbs above the workspace, opens nothing and shows a notice. Links to other kinds of file are unchanged.
+
 ## Backlinks and outline
 
 ⌥⌘L opens the Backlinks panel: every note that links to the current one. Enter opens the linking note at its link line.

@@ -45,12 +45,13 @@ import {
   WidgetType,
 } from "@codemirror/view";
 import { openableUrl } from "../../shared/links";
+import { isNoteLink } from "../../shared/noteLinks";
 import { isTouchPointer } from "../lib/viewport";
 import { modClick, tooltip } from "../commands/format";
 import { modHeld } from "../commands/keymap";
 import { textPosAtCoords } from "./clickPos";
 import { frontmatterRange } from "./frontmatter";
-import { openExternal, openTag, openWikiNote, wikiNotes } from "./bridge";
+import { followLink, openTag, openWikiNote, wikiNotes } from "./bridge";
 import { sessionIdFacet } from "./session";
 import { parseWikiTarget, resolveWikiTitle, WIKILINK_NODE, wikiTargetAt } from "./wikilinks";
 import { HASHTAG_NODE, tagAt } from "./tags";
@@ -61,9 +62,9 @@ export interface Span {
 }
 
 /** One concealment decision. `link`, `wikilink` and `done` mark visible text
- * and never remove it. `link`'s `url` is openableUrl-approved, or null when
- * the link has no openable target (reference links, relative paths) and is
- * only styled. `wikilink` carries the raw `[[target]]` inner text. Draw time
+ * and never remove it. `link`'s `url` is openableUrl-approved or a relative
+ * `.md` note link (linkUrl), or null when the link has no openable target
+ * (reference links, other relative paths) and is only styled. `wikilink` carries the raw `[[target]]` inner text. Draw time
  * decides whether that target resolves to a note (editor/wikilinks.ts), so
  * this core stays pure while the note list lives in the store. `task` replaces
  * a `[ ]`/`[x]` marker with a real checkbox, `rule` a `---` line with a drawn
@@ -328,7 +329,7 @@ export function concealments(
           kind: "link",
           from: node.from,
           to: node.to,
-          url: openableUrl(doc.sliceString(node.from, node.to)),
+          url: linkUrl(doc.sliceString(node.from, node.to)),
         });
       }
     },
@@ -362,10 +363,16 @@ export function decodeEntity(raw: string): string | null {
   return String.fromCodePoint(code);
 }
 
+// What a link's URL text may open: a URL for the OS (openableUrl), or a
+// relative `.md` path to a note, which followLink keeps in the app.
+function linkUrl(raw: string): string | null {
+  return openableUrl(raw) ?? (isNoteLink(raw) ? raw.trim() : null);
+}
+
 // The openable target of a Link/Image/Autolink element, or null.
 function urlOf(doc: DocSlice, el: SyntaxNode): string | null {
   const u = el.getChild("URL");
-  return u ? openableUrl(doc.sliceString(u.from, u.to)) : null;
+  return u ? linkUrl(doc.sliceString(u.from, u.to)) : null;
 }
 
 // The span of what stays on screen when `el` conceals: an autolink shows its
@@ -399,7 +406,7 @@ export function linkAt(
     for (let n: SyntaxNode | null = tree.resolveInner(pos, side); n; n = n.parent) {
       if (LINKISH.has(n.name)) return { from: n.from, to: n.to, url: urlOf(doc, n) };
       if (n.name === "URL" && !(n.parent && LINKISH.has(n.parent.name))) {
-        return { from: n.from, to: n.to, url: openableUrl(doc.sliceString(n.from, n.to)) };
+        return { from: n.from, to: n.to, url: linkUrl(doc.sliceString(n.from, n.to)) };
       }
     }
   }
@@ -708,7 +715,7 @@ const clickToOpen = EditorView.domEventHandlers({
     // still moves the DOM selection, CodeMirror syncs it back, and the caret
     // lands in the link, revealing the link that was just followed.
     event.preventDefault();
-    openExternal(link.url);
+    followLink(view.state.facet(sessionIdFacet), link.url);
     return true;
   },
 });
@@ -802,7 +809,7 @@ const hotspotPlugin = ViewPlugin.fromClass(
             width: r.width,
             height: r.height,
             title: "Click to open link",
-            act: () => openExternal(url),
+            act: () => followLink(view.state.facet(sessionIdFacet), url),
           });
         }
       }
@@ -926,7 +933,7 @@ export function openLinkAtCursor(view: EditorView): boolean {
   const session = view.state.facet(sessionIdFacet);
   if (hit.kind === "wiki") openWikiNote(session, hit.target);
   else if (hit.kind === "tag") openTag(session, hit.target);
-  else openExternal(hit.target);
+  else followLink(session, hit.target);
   return true;
 }
 

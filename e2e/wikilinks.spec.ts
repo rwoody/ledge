@@ -163,3 +163,30 @@ test("a background tab's hotspots leave the screen with it", async ({ page }) =>
   await expect(page.locator(".cm-line").first()).toHaveText("go Alpha");
   await expect(page.locator(".ledge-hotspot")).toHaveCount(1);
 });
+
+test("a relative .md link opens its note on click; one that finds no note says so and opens nothing", async ({
+  page,
+}) => {
+  await page.keyboard.press("Meta+a");
+  await page.keyboard.type("[map](beta.md) and [gone](nope.md) and [up](../x.md)");
+  await page.keyboard.press("Enter");
+  await expect(page.locator(".cm-line").first()).toHaveText("map and gone and up");
+
+  // All three are note links, so all three get a hotspot.
+  const hotspots = page.locator(".ledge-hotspot");
+  await expect(hotspots).toHaveCount(3);
+
+  // A target no note matches, and one above the workspace root, each answer
+  // with a notice and leave the app where it was.
+  await hotspots.nth(1).click();
+  await expect(page.getByText("No note at nope.md")).toBeVisible();
+  await hotspots.nth(2).click();
+  await expect(page.getByText(/points outside the workspace/)).toBeVisible();
+  await expect(page.locator("[data-tab]", { hasText: "Beta" })).toHaveCount(0);
+
+  // The resolvable one opens Beta. Nothing left the app.
+  await hotspots.nth(0).click();
+  await expect(page.locator("[data-tab]", { hasText: "Beta" })).toBeVisible();
+  await expect(page.locator(".cm-line", { hasText: "beta body" })).toBeVisible();
+  expect(await page.evaluate(() => window.__harness.linkOpens())).toHaveLength(0);
+});
